@@ -1,9 +1,12 @@
 package org.van.logging.aws;
 
 import java.io.ByteArrayInputStream;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 
 import org.apache.http.entity.ContentType;
+import org.apache.log4j.Layout;
+import org.apache.log4j.WriterAppender;
 import org.apache.log4j.spi.LoggingEvent;
 import org.van.logging.PublishContext;
 import org.van.logging.log4j.IPublishHelper;
@@ -39,7 +42,8 @@ public class S3PublishHelper implements IPublishHelper {
 	private final String path;
 	
 	private volatile boolean bucketExists = false;
-	private volatile StringBuilder stringBuilder;
+	private volatile StringWriter stringWriter;
+	private volatile WriterAppender writerAppender; // using log4j's code makes the formatting consistent with standard loggers.
 	
 	public S3PublishHelper(AmazonS3Client client, String bucket, String path) {
 		this.client = client;
@@ -52,12 +56,13 @@ public class S3PublishHelper implements IPublishHelper {
 	}
 	
 	public void publish(PublishContext context, int sequence, LoggingEvent event) {
-		stringBuilder.append(context.getLayout().format(event))
-			.append(LINE_SEPARATOR);
+		Layout layout = context.getLayout();
+		writerAppender.append(event);
 	}
 
 	public void start(PublishContext context) {
-		stringBuilder = new StringBuilder();
+		stringWriter = new StringWriter();
+		writerAppender = new WriterAppender(context.getLayout(), stringWriter);
 		
 		// There are two ways to go about this: either I call something like
 		// getBucketLocation()/listBuckets() and check to see if the bucket
@@ -90,7 +95,7 @@ public class S3PublishHelper implements IPublishHelper {
 		/* System.out.println(String.format("Publishing to S3 (bucket=%s; key=%s):",
 			bucket, key)); */
 		
-		String data = stringBuilder.toString();
+		String data = stringWriter.toString();
 		/* System.out.println(data); */
 		try {
 			ObjectMetadata metadata = new ObjectMetadata();
@@ -105,7 +110,8 @@ public class S3PublishHelper implements IPublishHelper {
 		} catch (UnsupportedEncodingException e) {
 			e.printStackTrace();
 		}
-		stringBuilder = null;
+		stringWriter = null;
+		writerAppender = null;
 	}
 
 }
