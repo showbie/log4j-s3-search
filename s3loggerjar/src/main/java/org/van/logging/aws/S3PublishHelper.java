@@ -36,6 +36,7 @@ import com.amazonaws.services.s3.model.PutObjectResult;
 public class S3PublishHelper implements IPublishHelper {
 	private static final String LINE_SEPARATOR = System.getProperty("line.separator");
 	private static final String S3ERRCODE_BUCKETALREADYOWNEDBYYOU = "BucketAlreadyOwnedByYou";
+	private static final String S3ERRCODE_ACCESSDENIED = "AccessDenied";
 	
 	private final AmazonS3Client client;
 	private final String bucket;
@@ -82,6 +83,11 @@ public class S3PublishHelper implements IPublishHelper {
 				if (S3ERRCODE_BUCKETALREADYOWNEDBYYOU.equals(ex.getErrorCode())) {
 					// If the exception is due to the bucket already existing,
 					// then swallow it.  This is "normal."
+					bucketExists = true;
+				} else if (S3ERRCODE_ACCESSDENIED.equals(ex.getErrorCode())) {
+					// could try to list buckets here, but instead just assuming
+					// that the bucket exists, and that we simply don't have
+					// permissions to create buckets.
 					bucketExists = true;
 				} else {
 					throw ex;
