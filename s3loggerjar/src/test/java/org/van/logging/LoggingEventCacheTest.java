@@ -1,18 +1,21 @@
 package org.van.logging;
 
-import org.apache.log4j.Logger;
-import org.apache.log4j.SimpleLayout;
-import org.apache.log4j.spi.LoggingEvent;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.powermock.modules.junit4.PowerMockRunner;
+import static org.apache.log4j.Level.INFO;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.log4j.Level.INFO;
+import org.apache.log4j.Logger;
+import org.apache.log4j.SimpleLayout;
+import org.apache.log4j.spi.LoggingEvent;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.powermock.modules.junit4.PowerMockRunner;
 
 /**
  * The tests here are more than unit tests and span across multiple classes and collaborators
@@ -30,9 +33,11 @@ public class LoggingEventCacheTest {
 
     /**
      * Make sure batch flushes do not lose any entries.
+     * @throws ExecutionException 
+     * @throws InterruptedException 
      */
     @Test
-    public void testBatchFlushing() {
+    public void testBatchFlushing() throws InterruptedException, ExecutionException {
         final List<LoggingEvent> events = new LinkedList<LoggingEvent>();
 
         IBufferPublisher publisher = new IBufferPublisher() {
@@ -51,19 +56,26 @@ public class LoggingEventCacheTest {
             public void endPublish(PublishContext context) {
             }
         };
-        LoggingEventCache cache = new LoggingEventCache(
-            "blah", new CapacityBasedBufferMonitor(BATCH_SIZE), publisher);
+        LoggingEventCache cache = new LoggingEventCache("blah", new CapacityBasedBufferMonitor(BATCH_SIZE), publisher);
+        
         for (int i = 0; i < EVENT_COUNT; i++) {
             cache.add(new LoggingEvent("org.van.Blah", logger, INFO,
                 String.format("Event %d", i),
                 null));
         }
-        cache.flushAndPublish();
+        
+        Future<Boolean> f = cache.flushAndPublish();
+        
+        Boolean result = f.get();
+        
+        assertTrue(result);
+        
         // The events list should contain eventCount entries if we published without skipping
-        Assert.assertEquals("All events published", EVENT_COUNT, events.size());
+        assertEquals("All events published", EVENT_COUNT, events.size());
     }
 
-    @Test
+    @SuppressWarnings("static-access")
+	@Test
     public void testTimeFlushing() {
         final List<LoggingEvent> events = new LinkedList<LoggingEvent>();
         IBufferPublisher publisher = new IBufferPublisher() {
@@ -104,6 +116,6 @@ public class LoggingEventCacheTest {
             }
             now = System.currentTimeMillis();
         }
-        Assert.assertEquals("All events published", EVENT_COUNT, events.size());
+        assertEquals("All events published", EVENT_COUNT, events.size());
     }
 }
